@@ -22,6 +22,15 @@ function Write-Info {
   Write-Host "[ghost-overlay] $Message"
 }
 
+function Write-Utf8NoBomFile {
+  param(
+    [string]$Path,
+    [string]$Content
+  )
+  $encoding = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 function Read-EnvValue {
   param(
     [string]$Path,
@@ -146,7 +155,8 @@ function Build-RuntimeProxyConfig {
     $lines.Add("  - `"$Token`"")
   }
 
-  Set-Content -Encoding UTF8 $proxyCfgRuntime $lines
+  $content = [string]::Join([Environment]::NewLine, $lines)
+  Write-Utf8NoBomFile -Path $proxyCfgRuntime -Content $content
 }
 
 function Test-ClaudeAuthPayload {
@@ -322,7 +332,8 @@ function Try-ImportClaudeCredentialsStore {
   }
 
   $target = Join-Path $proxyAuthDir "claude.json"
-  $bestPayload | ConvertTo-Json -Depth 10 | Set-Content -Path $target -Encoding UTF8
+  $jsonOut = $bestPayload | ConvertTo-Json -Depth 10
+  Write-Utf8NoBomFile -Path $target -Content $jsonOut
   Write-Info "Imported Claude credentials from: $bestCandidate"
   return $true
 }
