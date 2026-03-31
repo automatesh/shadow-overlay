@@ -74,7 +74,7 @@ function Ensure-NpmDependencies {
 
   $npm = Get-Command npm -ErrorAction SilentlyContinue
   if ($null -eq $npm) {
-    Write-Info "ERROR: npm не найден в PATH. Установите Node.js и повторите запуск."
+    Write-Info "ERROR: npm is not found in PATH. Install Node.js and run start.bat again."
     exit 3
   }
 
@@ -169,6 +169,123 @@ function Test-ClaudeAuthPayload {
   return $false
 }
 
+function Get-ClaudeCredentialsCandidates {
+  $candidates = [System.Collections.Generic.List[string]]::new()
+
+  if (-not [string]::IsNullOrWhiteSpace($env:CLAUDE_CREDENTIALS_PATH)) {
+    $candidates.Add($env:CLAUDE_CREDENTIALS_PATH)
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($HOME)) {
+    $candidates.Add((Join-Path (Join-Path $HOME ".claude") ".credentials.json"))
+    $candidates.Add((Join-Path (Join-Path $HOME ".config") "claude/.credentials.json"))
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+    $candidates.Add((Join-Path (Join-Path $env:USERPROFILE ".claude") ".credentials.json"))
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($env:XDG_CONFIG_HOME)) {
+    $candidates.Add((Join-Path (Join-Path $env:XDG_CONFIG_HOME "claude") ".credentials.json"))
+  }
+
+  $unique = [System.Collections.Generic.List[string]]::new()
+  foreach ($path in $candidates) {
+    if ([string]::IsNullOrWhiteSpace($path)) { continue }
+    $normalized = $path.Trim()
+    if ($unique -notcontains $normalized) {
+      $unique.Add($normalized)
+    }
+  }
+  return $unique
+}
+
+function Normalize-ClaudeAuthPayload {
+  param([object]$Obj)
+
+  if ($null -eq $Obj) { return $null }
+
+  if ($Obj.PSObject.Properties.Name -contains "claudeAiOauth") {
+    $oauth = $Obj.claudeAiOauth
+    if ($oauth -and $oauth.accessToken -and $oauth.refreshToken) {
+      return $Obj
+    }
+  }
+
+  if (
+    ($Obj.PSObject.Properties.Name -contains "accessToken") -and
+    ($Obj.PSObject.Properties.Name -contains "refreshToken")
+  ) {
+    return @{
+      claudeAiOauth = @{
+        accessToken = [string]$Obj.accessToken
+        refreshToken = [string]$Obj.refreshToken
+        expiresAt = $Obj.expiresAt
+        scopes = $Obj.scopes
+        subscriptionType = $Obj.subscriptionType
+        rateLimitTier = $Obj.rateLimitTier
+      }
+    }
+  }
+
+  if (
+    ($Obj.PSObject.Properties.Name -contains "access_token") -and
+    ($Obj.PSObject.Properties.Name -contains "refresh_token")
+  ) {
+    return @{
+      access_token = [string]$Obj.access_token
+      refresh_token = [string]$Obj.refresh_token
+      expires_at = $Obj.expires_at
+      email = $Obj.email
+      type = "claude"
+      disabled = $false
+    }
+  }
+
+  return $null
+}
+
+function Try-ImportClaudeCredentialsStore {
+  if (-not (Test-Path $proxyAuthDir)) {
+    New-Item -Path $proxyAuthDir -ItemType Directory -Force | Out-Null
+  }
+
+  $bestCandidate = $null
+  $bestPayload = $null
+  $bestWriteTime = [datetime]::MinValue
+
+  $candidates = Get-ClaudeCredentialsCandidates
+  foreach ($candidate in $candidates) {
+    if (-not (Test-Path $candidate)) { continue }
+    try {
+      $raw = Get-Content -Path $candidate -Raw -Encoding UTF8
+      if ([string]::IsNullOrWhiteSpace($raw)) { continue }
+
+      $json = $raw | ConvertFrom-Json -ErrorAction Stop
+      $normalized = Normalize-ClaudeAuthPayload -Obj $json
+      if ($null -eq $normalized) { continue }
+
+      $info = Get-Item -Path $candidate -ErrorAction Stop
+      if ($info.LastWriteTime -gt $bestWriteTime) {
+        $bestWriteTime = $info.LastWriteTime
+        $bestCandidate = $candidate
+        $bestPayload = $normalized
+      }
+    } catch {
+      continue
+    }
+  }
+
+  if ($null -eq $bestPayload) {
+    return $false
+  }
+
+  $target = Join-Path $proxyAuthDir "claude.json"
+  $bestPayload | ConvertTo-Json -Depth 10 | Set-Content -Path $target -Encoding UTF8
+  Write-Info "Imported Claude credentials from: $bestCandidate"
+  return $true
+}
+
 function Has-ClaudeAuthArtifacts {
   if (-not (Test-Path $proxyAuthDir)) { return $false }
   $files = Get-ChildItem -Path $proxyAuthDir -Filter "*.json" -File -ErrorAction SilentlyContinue
@@ -185,7 +302,12 @@ function Try-ImportClaudeAuthArtifacts {
     return
   }
 
-  Write-Info "proxy/auth is empty. Scanning project directory for Claude auth artifacts..."
+  Write-Info "proxy/auth is empty. Trying system Claude credentials..."
+  if (Try-ImportClaudeCredentialsStore) {
+    return
+  }
+
+  Write-Info "No valid system credentials found. Scanning project directory for Claude auth artifacts..."
   $skipPattern = '\\(node_modules|\.git|proxy\\auth|proxy\\static|dist|build|out|coverage)\\'
   $candidates = Get-ChildItem -Path $root -Recurse -File -Filter *.json -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match 'claude' -and $_.FullName -notmatch $skipPattern }
