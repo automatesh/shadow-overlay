@@ -49,18 +49,18 @@ function Ensure-ConfigFile {
 
 function Ensure-EnvAndToken {
   if (-not (Test-Path $envFile)) {
-    Write-Info "ERROR: Файл .env не найден."
-    Write-Info "Создайте .env на основе .env.example, заполните ключи и повторите запуск."
+    Write-Info "ERROR: .env file is missing."
+    Write-Info "Create .env from .env.example, fill required keys, then run start.bat again."
     if (Test-Path $envExampleFile) {
-      Write-Info "Шаблон: $envExampleFile"
+      Write-Info "Template: $envExampleFile"
     }
     exit 2
   }
 
   $token = Read-EnvValue -Path $envFile -Key "CLAUDE_CODE_SETUP_TOKEN"
   if ([string]::IsNullOrWhiteSpace($token)) {
-    Write-Info "ERROR: В .env отсутствует CLAUDE_CODE_SETUP_TOKEN."
-    Write-Info "Заполните .env по шаблону .env.example и повторите запуск."
+    Write-Info "ERROR: CLAUDE_CODE_SETUP_TOKEN is missing in .env."
+    Write-Info "Fill .env using .env.example and run start.bat again."
     exit 2
   }
   return $token
