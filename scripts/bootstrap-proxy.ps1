@@ -340,12 +340,12 @@ function Try-ImportClaudeAuthArtifacts {
 
   if (Has-ClaudeAuthArtifacts) {
     Write-Info "Claude auth artifacts already present in proxy/auth."
-    return
+    return $false
   }
 
   Write-Info "proxy/auth is empty. Trying system Claude credentials..."
   if (Try-ImportClaudeCredentialsStore) {
-    return
+    return $true
   }
 
   Write-Info "No valid system credentials found. Scanning project directory for Claude auth artifacts..."
@@ -370,7 +370,7 @@ function Try-ImportClaudeAuthArtifacts {
   if ($validFiles.Count -eq 0) {
     Write-Info "WARNING: Claude auth artifacts were not found automatically."
     Write-Info "Add claude auth json files to proxy/auth (example: claude.json, claude-<email>.json)."
-    return
+    return $false
   }
 
   foreach ($file in $validFiles) {
@@ -381,6 +381,7 @@ function Try-ImportClaudeAuthArtifacts {
   }
 
   Write-Info "Imported $($validFiles.Count) Claude auth artifact(s) into proxy/auth."
+  return $true
 }
 
 function Start-LocalProxy {
@@ -394,6 +395,10 @@ function Start-LocalProxy {
 }
 
 function Ensure-ProxyIsRunning {
+  param(
+    [bool]$ForceRestart = $false
+  )
+
   if (-not (Test-Path $proxyExe)) {
     Write-Info "WARNING: proxy runtime not found at $proxyExe"
     return
@@ -416,6 +421,38 @@ function Ensure-ProxyIsRunning {
     $procCmd -and
     ($procCmd.ToLower().Contains("config.runtime.yaml"))
   ) {
+    if ($ForceRestart) {
+      Write-Info "Auth artifacts changed. Restarting local proxy to reload credentials..."
+    } else {
+      Write-Info "Local proxy already listening on port $proxyPort."
+      return
+    }
+  }
+
+  if (
+    $procExe -and
+    (($procExe.ToLower()) -eq ($proxyExe.ToLower())) -and
+    $procCmd -and
+    ($procCmd.ToLower().Contains("config.runtime.yaml")) -and
+    $ForceRestart
+  ) {
+    try {
+      Stop-Process -Id $ownerPid -Force -ErrorAction Stop
+      Start-Sleep -Seconds 1
+    } catch {
+      Write-Info "WARNING: failed to stop PID $ownerPid. $_"
+    }
+    Start-LocalProxy
+    return
+  }
+
+  if (
+    $procExe -and
+    (($procExe.ToLower()) -eq ($proxyExe.ToLower())) -and
+    $procCmd -and
+    ($procCmd.ToLower().Contains("config.runtime.yaml")) -and
+    (-not $ForceRestart)
+  ) {
     Write-Info "Local proxy already listening on port $proxyPort."
     return
   }
@@ -434,6 +471,6 @@ function Ensure-ProxyIsRunning {
 Ensure-ConfigFile
 $token = Ensure-EnvAndToken
 Ensure-NpmDependencies
-Try-ImportClaudeAuthArtifacts
+$authImported = Try-ImportClaudeAuthArtifacts
 Build-RuntimeProxyConfig -Token $token
-Ensure-ProxyIsRunning
+Ensure-ProxyIsRunning -ForceRestart:$authImported
