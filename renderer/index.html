@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="dragbar">
+      <span id="title">Ghost</span>
+      <div id="controls">
+        <button id="stt-btn" title="Ctrl+Shift+R">MIC</button>
+        <button id="screenshot-btn" title="Ctrl+Shift+S">SCR</button>
+      </div>
+    </div>
+
+    <div id="transcript-area">
+      <div id="transcript" class="scroll-area"></div>
+    </div>
+
+    <div id="response-area">
+      <div id="response" class="scroll-area"></div>
+    </div>
+
+    <div id="input-area">
+      <textarea id="input" placeholder="Вопрос..." rows="2"></textarea>
+    </div>
+
+    <div id="status-bar">
+      <span id="status">Ready</span>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

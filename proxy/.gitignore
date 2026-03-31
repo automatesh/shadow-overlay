@@ -1,0 +1,6 @@
+auth/
+proxy.log
+*.log
+error-*.log
+config.runtime.yaml
+static/

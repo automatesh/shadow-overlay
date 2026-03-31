@@ -1,0 +1,16 @@
+{
+  "name": "ghost-overlay",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "claude": {
+    "baseUrl": "http://127.0.0.1:8317",
+    "apiKey": "",
+    "model": "claude-haiku-4-5-20251001",
+    "systemPrompt": "Ты помощник на собеседовании. Отвечай кратко, по существу, на русском. Не используй markdown форматирование.",
+    "profileDir": "profile",
+    "transcriptAutoPrompt": "Вот транскрипция разговора. Ответь на последний заданный вопрос кратко и по существу.",
+    "screenshotAutoPrompt": "Вот скриншот экрана. Ответь на вопрос который видишь, кратко и по существу."
+  },
+  "whisper": {
+    "apiKey": "",
+    "model": "whisper-1",
+    "language": "ru",
+    "chunkSeconds": 15
+  },
+  "hotkeys": {
+    "toggle": "Ctrl+Shift+H",
+    "screenshot": "Ctrl+Shift+S",
+    "sttToggle": "Ctrl+Shift+R",
+    "sendTranscript": "Ctrl+Shift+T",
+    "sendScreenshot": "Ctrl+Shift+G"
+  },
+  "window": {
+    "width": 400,
+    "height": 600,
+    "opacity": 0.6
+  },
+  "ui": {
+    "showHistory": true
+  }
+}
