@@ -208,7 +208,31 @@ function Normalize-ClaudeAuthPayload {
   if ($Obj.PSObject.Properties.Name -contains "claudeAiOauth") {
     $oauth = $Obj.claudeAiOauth
     if ($oauth -and $oauth.accessToken -and $oauth.refreshToken) {
-      return $Obj
+      $expired = $null
+      if ($oauth.expiresAt) {
+        try {
+          $expired = [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$oauth.expiresAt).UtcDateTime.ToString("o")
+        } catch {
+          $expired = $null
+        }
+      }
+      return @{
+        access_token = [string]$oauth.accessToken
+        refresh_token = [string]$oauth.refreshToken
+        expired = $expired
+        last_refresh = (Get-Date).ToUniversalTime().ToString("o")
+        email = $Obj.email
+        type = "claude"
+        disabled = $false
+        claudeAiOauth = @{
+          accessToken = [string]$oauth.accessToken
+          refreshToken = [string]$oauth.refreshToken
+          expiresAt = $oauth.expiresAt
+          scopes = $oauth.scopes
+          subscriptionType = $oauth.subscriptionType
+          rateLimitTier = $oauth.rateLimitTier
+        }
+      }
     }
   }
 
@@ -216,15 +240,22 @@ function Normalize-ClaudeAuthPayload {
     ($Obj.PSObject.Properties.Name -contains "accessToken") -and
     ($Obj.PSObject.Properties.Name -contains "refreshToken")
   ) {
-    return @{
-      claudeAiOauth = @{
-        accessToken = [string]$Obj.accessToken
-        refreshToken = [string]$Obj.refreshToken
-        expiresAt = $Obj.expiresAt
-        scopes = $Obj.scopes
-        subscriptionType = $Obj.subscriptionType
-        rateLimitTier = $Obj.rateLimitTier
+    $expired = $null
+    if ($Obj.expiresAt) {
+      try {
+        $expired = [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$Obj.expiresAt).UtcDateTime.ToString("o")
+      } catch {
+        $expired = $null
       }
+    }
+    return @{
+      access_token = [string]$Obj.accessToken
+      refresh_token = [string]$Obj.refreshToken
+      expired = $expired
+      last_refresh = (Get-Date).ToUniversalTime().ToString("o")
+      email = $Obj.email
+      type = "claude"
+      disabled = $false
     }
   }
 
@@ -232,13 +263,23 @@ function Normalize-ClaudeAuthPayload {
     ($Obj.PSObject.Properties.Name -contains "access_token") -and
     ($Obj.PSObject.Properties.Name -contains "refresh_token")
   ) {
+    $type = $Obj.type
+    if ([string]::IsNullOrWhiteSpace($type)) {
+      $type = "claude"
+    }
+    $disabled = $Obj.disabled
+    if ($null -eq $disabled) {
+      $disabled = $false
+    }
     return @{
       access_token = [string]$Obj.access_token
       refresh_token = [string]$Obj.refresh_token
+      expired = $Obj.expired
       expires_at = $Obj.expires_at
+      last_refresh = $Obj.last_refresh
       email = $Obj.email
-      type = "claude"
-      disabled = $false
+      type = $type
+      disabled = $disabled
     }
   }
 
